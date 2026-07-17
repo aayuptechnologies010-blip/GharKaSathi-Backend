@@ -1,0 +1,1698 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-ghar-ka-saathi-backend",
+    "name": "Ghar Ka Sathi — Backend API",
+    "description": "Full API collection for the Ghar Ka Sathi backend (User panel, Service Provider panel, Admin panel).\n\nHOW TO USE:\n1. Import this file AND 'postman_environment.json' into Postman, then select the 'Ghar Ka Sathi - Local' environment (top-right dropdown).\n2. Make sure the backend is running (npm run dev) and MONGO_URI points to a live MongoDB.\n3. Run 'Auth > Admin Login' first — it auto-saves {{adminToken}}.\n4. 'Auth > Verify OTP' needs a REAL Firebase phone-auth idToken, which you will not have out of the box. Easiest options:\n   a) In Firebase Console > Authentication > Sign-in method > Phone > add a test phone number, sign in with it from a client app, and paste the resulting idToken here.\n   b) Ask your backend dev to seed a test User/ServiceProvider directly in MongoDB and hand you a JWT for {{userToken}} / {{providerToken}} — this is what was used during development testing.\n5. Once you have userToken/providerToken, run requests top-to-bottom within each folder — IDs (categoryId, providerId, bookingId, userId, complaintId) auto-save into collection variables via each request's Tests script, so later requests fill in automatically.\n6. Admin-only routes need {{adminToken}}; user-only need {{userToken}}; provider-only need {{providerToken}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Simple liveness check — should return {\"status\":\"ok\"}."
+      },
+      "response": []
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Verify OTP — User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"<firebase-id-token>\",\n  \"role\": \"user\",\n  \"name\": \"Test User\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Client verifies phone OTP with Firebase, then sends the resulting idToken here. Backend verifies it, finds-or-creates the User, returns our JWT. Needs a REAL Firebase idToken (see collection description for how to get one for testing)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'token'); if (__gksV !== undefined) { pm.environment.set('userToken', __gksV); pm.collectionVariables.set('userToken', __gksV); console.log('Saved userToken =', __gksV); } }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'account._id'); if (__gksV !== undefined) { pm.environment.set('userId', __gksV); pm.collectionVariables.set('userId', __gksV); console.log('Saved userId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP — Provider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"<firebase-id-token>\",\n  \"role\": \"provider\",\n  \"name\": \"Test Provider\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Same as above but role: provider — finds-or-creates a ServiceProvider account."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'token'); if (__gksV !== undefined) { pm.environment.set('providerToken', __gksV); pm.collectionVariables.set('providerToken', __gksV); console.log('Saved providerToken =', __gksV); } }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'account._id'); if (__gksV !== undefined) { pm.environment.set('providerId', __gksV); pm.collectionVariables.set('providerId', __gksV); console.log('Saved providerId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/admin/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "admin",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gharkasaathi.com\",\n  \"password\": \"change-me\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Email/password login for the seeded admin (npm run seed:admin). Auto-saves {{adminToken}}."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'token'); if (__gksV !== undefined) { pm.environment.set('adminToken', __gksV); pm.collectionVariables.set('adminToken', __gksV); console.log('Saved adminToken =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "description": "Public. Active categories only."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Plumber\",\n  \"commissionPercent\": 15,\n  \"description\": \"Plumbing services\",\n  \"icon\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('categoryId', __gksV); pm.collectionVariables.set('categoryId', __gksV); console.log('Saved categoryId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Category (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{categoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{categoryId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commissionPercent\": 12,\n  \"isActive\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Panel",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Auto-saves {{userId}} for use in Admin > Suspend/Reinstate User."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('userId', __gksV); pm.collectionVariables.set('userId', __gksV); console.log('Saved userId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"email\": \"user@example.com\",\n  \"profileImage\": \"https://example.com/photo.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update My Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/me/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "me",
+                "location"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Connaught Place, Delhi\",\n  \"lat\": 28.6315,\n  \"lng\": 77.2167\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Service Provider Panel",
+      "item": [
+        {
+          "name": "Search Providers (Nearby / By Category)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/search?categoryId={{categoryId}}&lat=28.6139&lng=77.2090&radiusKm=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "categoryId",
+                  "value": "{{categoryId}}",
+                  "disabled": false
+                },
+                {
+                  "key": "lat",
+                  "value": "28.6139",
+                  "disabled": false
+                },
+                {
+                  "key": "lng",
+                  "value": "77.2090",
+                  "disabled": false
+                },
+                {
+                  "key": "radiusKm",
+                  "value": "10",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Public. This is what powers \"Search Services\" + \"Nearby Service Providers\" in the User panel. Omit lat/lng to just filter by category, sorted by rating."
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "me"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('providerId', __gksV); pm.collectionVariables.set('providerId', __gksV); console.log('Saved providerId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Complete/Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ramesh Plumber\",\n  \"categories\": [\n    \"{{categoryId}}\"\n  ],\n  \"documents\": [\n    \"aadhaar.jpg\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sets name, service categories, and KYC documents. categories must be valid, active Category ids."
+          },
+          "response": []
+        },
+        {
+          "name": "Update My Location",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/me/location",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "me",
+                "location"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Sector 21, Noida\",\n  \"lat\": 28.58,\n  \"lng\": 77.31\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Also updates the GeoJSON location used by nearby search."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Availability",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/me/availability",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "me",
+                "availability"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Earnings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/providers/me/earnings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "providers",
+                "me",
+                "earnings"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"providerId\": \"{{providerId}}\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"scheduledAt\": \"2026-08-01T10:00:00.000Z\",\n  \"address\": {\n    \"text\": \"My House, Delhi\",\n    \"lat\": 28.61,\n    \"lng\": 77.2\n  },\n  \"notes\": \"Leaking tap in kitchen\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Fails 400 if the provider is not approved/available, or does not offer the given category."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('bookingId', __gksV); pm.collectionVariables.set('bookingId', __gksV); console.log('Saved bookingId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Bookings (User) — Booking History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "my"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Track Booking (User or Provider)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Works with either {{userToken}} (if you own the booking) or {{providerToken}} (if assigned) — swap the Authorization value to test both."
+          },
+          "response": []
+        },
+        {
+          "name": "Provider Bookings — Order/Booking Receive",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/provider?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "provider"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Booking + Quote Price",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\",\n  \"price\": 500\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Run this next in the happy path (do NOT run Cancel/Reject below first, or this booking will already be in a terminal state)."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark In Progress",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in-progress\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Completed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Fails 400 if no price was quoted yet (accept with a price first). Needed before Payments and Add Review below will work."
+          },
+          "response": []
+        },
+        {
+          "name": "Add Review (User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "review"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Great work, on time!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Only works once booking status is completed (run Mark Completed above first)."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel Booking (User) — alternate path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "cancel"
+              ]
+            },
+            "description": "ALTERNATE ENDING — only run this on a booking that's still pending/accepted/in-progress. If you already ran Mark Completed above on {{bookingId}}, create a fresh booking first (re-run 'Create Booking') before testing this, otherwise it will correctly fail with 400."
+          },
+          "response": []
+        },
+        {
+          "name": "Reject Booking (Provider) — alternate path",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/{{bookingId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "bookings",
+                "{{bookingId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "ALTERNATE ENDING — same caveat as Cancel Booking above: test on a fresh booking, not one already completed/cancelled."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Razorpay Order (User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/create-order",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "create-order"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Needs RAZORPAY_KEY_ID/SECRET configured in .env, else returns 503. Booking must already have a price quote."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, 'orderId'); if (__gksV !== undefined) { pm.environment.set('razorpayOrderId', __gksV); pm.collectionVariables.set('razorpayOrderId', __gksV); console.log('Saved razorpayOrderId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Razorpay Payment (User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "verify"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razorpayOrderId\": \"{{razorpayOrderId}}\",\n  \"razorpayPaymentId\": \"<from-razorpay-checkout>\",\n  \"razorpaySignature\": \"<from-razorpay-checkout>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "These three fields come from the Razorpay Checkout success callback on the client — cannot be fabricated for testing without a real gateway transaction."
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Cash Payment Received (Provider)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{providerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/cash",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "payments",
+                "cash"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Booking must be status \"completed\" first. Splits price into commission (per category) + provider payout, credits provider earnings."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Get Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "{{bookingId}}"
+              ]
+            },
+            "description": "Works with userToken or providerToken, whichever is on that booking."
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chat/{{bookingId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chat",
+                "{{bookingId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"What time will you arrive?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Also broadcasts in real time over Socket.io to room booking:<id> — REST is enough for functional testing."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Complaints",
+      "item": [
+        {
+          "name": "File Complaint (User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "complaints"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": \"{{bookingId}}\",\n  \"subject\": \"Late arrival\",\n  \"description\": \"Provider arrived 2 hours late.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('complaintId', __gksV); pm.collectionVariables.set('complaintId', __gksV); console.log('Saved complaintId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My Complaints (User)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{userToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "complaints",
+                "my"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin Panel",
+      "item": [
+        {
+          "name": "List All Categories (incl. inactive) — Category Management",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Providers — Approval Queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/providers?approved=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "providers"
+              ],
+              "query": [
+                {
+                  "key": "approved",
+                  "value": "false",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Omit the approved query param to list all providers regardless of status."
+          },
+          "response": []
+        },
+        {
+          "name": "Approve Provider",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/providers/{{providerId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "providers",
+                "{{providerId}}",
+                "approve"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend Provider",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/providers/{{providerId}}/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "providers",
+                "{{providerId}}",
+                "suspend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reinstate Provider",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/providers/{{providerId}}/reinstate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "providers",
+                "{{providerId}}",
+                "reinstate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Users — User Management",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/suspend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "{{userId}}",
+                "suspend"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reinstate User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}/reinstate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "users",
+                "{{userId}}",
+                "reinstate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Complaints — Complaint Management",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/complaints?status=open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "complaints"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "open",
+                  "disabled": false
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolve Complaint",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/complaints/{{complaintId}}/resolve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "complaints",
+                "{{complaintId}}",
+                "resolve"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\",\n  \"adminNote\": \"Provider warned about punctuality.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/payments?",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "paid",
+                  "disabled": true
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Payment Summary — Commission Earned",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/payments/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "payments",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Analytics Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/analytics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "analytics"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "providerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "providerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "bookingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "complaintId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "razorpayOrderId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
