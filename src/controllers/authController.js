@@ -6,6 +6,23 @@ const Admin = require('../models/Admin');
 const asyncHandler = require('../utils/asyncHandler');
 const generateToken = require('../utils/generateToken');
 
+// POST /api/auth/check-mobile
+// Called BEFORE the client sends the OTP (i.e. before Firebase's client-side send-OTP call).
+// Only looks up whether the number is registered — never creates anything here. The client
+// stores the returned newUser flag locally and uses it to decide navigation after OTP verify.
+const checkMobile = asyncHandler(async (req, res) => {
+  const { phone, role } = req.body;
+
+  if (!phone || !['user', 'provider'].includes(role)) {
+    return res.status(400).json({ message: 'phone and role (user|provider) are required' });
+  }
+
+  const Model = role === 'user' ? User : ServiceProvider;
+  const existing = await Model.findOne({ phone });
+
+  res.json({ newUser: !existing });
+});
+
 // POST /api/auth/verify-otp
 // Client verifies the OTP with Firebase phone auth and sends us the resulting idToken.
 // We verify it server-side, then find-or-create the account for the requested role.
@@ -69,4 +86,4 @@ const adminLogin = asyncHandler(async (req, res) => {
   res.json({ token, account: { id: account._id, name: account.name, email: account.email } });
 });
 
-module.exports = { verifyOtp, adminLogin };
+module.exports = { checkMobile, verifyOtp, adminLogin };

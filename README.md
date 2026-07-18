@@ -25,15 +25,20 @@ use a Firebase test phone number from a client app, or seed a test User/ServiceP
 hand-craft a JWT the way this was validated during development (see `src/utils/generateToken.js`).
 
 This collection was run end-to-end through Newman (`npx newman run postman_collection.json -e postman_environment.json`)
-against a live local instance — all 50 requests, including the full booking → payment → chat → complaint →
+against a live local instance — all 51 requests, including the full booking → payment → chat → complaint →
 admin-analytics lifecycle, work as documented.
 
 ## Auth model
 
-- **User / Service Provider**: phone OTP via Firebase Auth on the client. Client sends the resulting
-  Firebase `idToken` to `POST /api/auth/verify-otp` with `role: "user" | "provider"`. Backend verifies
-  the token, finds-or-creates the account, and returns our own JWT for subsequent requests
-  (`Authorization: Bearer <token>`).
+- **User / Service Provider** — two-step phone-OTP flow:
+  1. `POST /api/auth/check-mobile` with `{ phone, role }`, called the moment the user taps "Send OTP"
+     — **before** the client actually triggers Firebase's OTP send. Only looks up whether the phone is
+     already registered; never creates anything. Returns `{ newUser: true|false }` for the client to
+     store and use later to decide navigation (new → Registration/Profile Setup, existing → Home).
+  2. Client sends the OTP via Firebase (client-side) and verifies it, then sends the resulting Firebase
+     `idToken` to `POST /api/auth/verify-otp` with `role: "user" | "provider"`. Backend verifies the
+     token, finds-or-creates the account, and returns our own JWT for subsequent requests
+     (`Authorization: Bearer <token>`) — this step always runs, for both new and existing users.
 - **Admin**: email/password via `POST /api/auth/admin/login` (seeded with `npm run seed:admin`).
 
 Suspended accounts (`isActive: false`, set by admin) are rejected at the auth middleware regardless of role.
@@ -42,7 +47,7 @@ Suspended accounts (`isActive: false`, set by admin) are rejected at the auth mi
 
 | Panel | Endpoints |
 |---|---|
-| Auth | `POST /api/auth/verify-otp`, `POST /api/auth/admin/login` |
+| Auth | `POST /api/auth/check-mobile` (pre-OTP existence check), `POST /api/auth/verify-otp`, `POST /api/auth/admin/login` |
 | User | `GET/PUT /api/users/me`, `PUT /api/users/me/location` |
 | Service Provider | `GET/PUT /api/providers/me`, `PUT /api/providers/me/location`, `GET /api/providers/search?categoryId=&lat=&lng=&radiusKm=` (public, nearby search), `PUT /api/providers/me/availability`, `GET /api/providers/me/earnings` |
 | Categories | `GET /api/categories` (public, active only), `POST/PUT /api/categories` (admin, includes `commissionPercent`), `GET /api/admin/categories` (admin, includes inactive), `PUT /api/categories/:id/activate`\|`deactivate` (admin), `DELETE /api/categories/:id` (admin — hard-deletes only if no provider/booking references it, else 409 telling you to deactivate instead) |

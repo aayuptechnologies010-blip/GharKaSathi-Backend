@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-ghar-ka-saathi-backend",
     "name": "Ghar Ka Sathi — Backend API",
-    "description": "Full API collection for the Ghar Ka Sathi backend (User panel, Service Provider panel, Admin panel).\n\nHOW TO USE:\n1. Import this file AND 'postman_environment.json' into Postman, then select the 'Ghar Ka Sathi - Local' environment (top-right dropdown).\n2. Make sure the backend is running (npm run dev) and MONGO_URI points to a live MongoDB.\n3. Run 'Auth > Admin Login' first — it auto-saves {{adminToken}}.\n4. 'Auth > Verify OTP' needs a REAL Firebase phone-auth idToken, which you will not have out of the box. Easiest options:\n   a) In Firebase Console > Authentication > Sign-in method > Phone > add a test phone number, sign in with it from a client app, and paste the resulting idToken here.\n   b) Ask your backend dev to seed a test User/ServiceProvider directly in MongoDB and hand you a JWT for {{userToken}} / {{providerToken}} — this is what was used during development testing.\n5. Once you have userToken/providerToken, run requests top-to-bottom within each folder — IDs (categoryId, providerId, bookingId, userId, complaintId) auto-save into collection variables via each request's Tests script, so later requests fill in automatically.\n6. Admin-only routes need {{adminToken}}; user-only need {{userToken}}; provider-only need {{providerToken}}.",
+    "description": "Full API collection for the Ghar Ka Sathi backend (User panel, Service Provider panel, Admin panel).\n\nHOW TO USE:\n1. Import this file AND 'postman_environment.json' into Postman, then select the 'Ghar Ka Sathi - Local' environment (top-right dropdown).\n2. Make sure the backend is running (npm run dev) and MONGO_URI points to a live MongoDB.\n3. Run 'Auth > Admin Login' first — it auto-saves {{adminToken}}.\n3b. Mobile login flow is two steps: 'Auth > Check Mobile' (before the OTP is even sent — just tells the client whether this number is new) then 'Auth > Verify OTP' (after the client verifies the OTP with Firebase). Check Mobile never creates a record; Verify OTP is what actually logs the user in and creates one if new.\n4. 'Auth > Verify OTP' needs a REAL Firebase phone-auth idToken, which you will not have out of the box. Easiest options:\n   a) In Firebase Console > Authentication > Sign-in method > Phone > add a test phone number, sign in with it from a client app, and paste the resulting idToken here.\n   b) Ask your backend dev to seed a test User/ServiceProvider directly in MongoDB and hand you a JWT for {{userToken}} / {{providerToken}} — this is what was used during development testing.\n5. Once you have userToken/providerToken, run requests top-to-bottom within each folder — IDs (categoryId, providerId, bookingId, userId, complaintId) auto-save into collection variables via each request's Tests script, so later requests fill in automatically.\n6. Admin-only routes need {{adminToken}}; user-only need {{userToken}}; provider-only need {{providerToken}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -27,6 +27,40 @@
     {
       "name": "Auth",
       "item": [
+        {
+          "name": "Check Mobile (before sending OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/check-mobile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "check-mobile"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+919876543210\",\n  \"role\": \"user\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Call this the moment the user taps \"Send OTP\", BEFORE actually triggering Firebase's OTP send. Only checks whether the phone number is already registered — never creates anything. Returns { \"newUser\": true|false }. Store this on the client and use it after OTP verify succeeds to decide navigation (new -> Registration/Profile Setup, existing -> Home)."
+          },
+          "response": []
+        },
         {
           "name": "Verify OTP — User",
           "request": {
