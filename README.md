@@ -15,18 +15,26 @@ npm run dev              # or: npm start
 ## Testing the API
 
 Import `postman_collection.json` and `postman_environment.json` into Postman (or Insomnia / Thunder Client),
-select the "Ghar Ka Sathi - Local" environment, and run requests folder by folder — every request that
-returns a token or id (Admin Login, Get My Profile, Create Category, Create Booking, File Complaint) auto-saves
-it into the environment, so later requests fill in `{{adminToken}}`, `{{categoryId}}`, `{{bookingId}}`, etc.
-automatically. Full usage notes are in the collection's own description (visible in Postman when you open it).
+select the "Ghar Ka Sathi - Local" environment. The collection is organized into exactly the 3 product panels —
+**Service Provider Panel**, **User Panel**, **Admin Panel** — each broken into sub-folders (Registration/Login,
+Profile Management, Bookings, Payments, Chat, etc.) matching the feature list in the product spec.
 
-`Auth > Verify OTP` needs a real Firebase phone-auth idToken, which isn't obtainable from Postman alone — either
-use a Firebase test phone number from a client app, or seed a test User/ServiceProvider directly in MongoDB and
+A booking involves both a provider and a user, so the two panels genuinely interleave — running the file strictly
+top-to-bottom by folder is **not** the real order. The collection description (visible when you open it in Postman)
+spells out the realistic sequence: Service Provider Panel (register → setup → profile → get approved) → User Panel
+(register → search → book) → Service Provider Panel (accept → complete the booking) → User Panel (pay/review) →
+either panel (chat) → User Panel (complaint) → Admin Panel (resolve/reports, works any time after setup). Every
+request that returns a token or id (Admin Login, Get My Profile, Create Booking, File Complaint, ...) auto-saves it
+into the environment, so later requests in that sequence fill in `{{adminToken}}`, `{{categoryId}}`, `{{bookingId}}`,
+etc. automatically.
+
+`Verify OTP` needs a real Firebase phone-auth idToken, which isn't obtainable from Postman alone — either use a
+Firebase test phone number from a client app, or seed a test User/ServiceProvider directly in MongoDB and
 hand-craft a JWT the way this was validated during development (see `src/utils/generateToken.js`).
 
-This collection was run end-to-end through Newman (`npx newman run postman_collection.json -e postman_environment.json`)
-against a live local instance — all 55 requests, including the full booking → payment → chat → complaint →
-admin-analytics lifecycle, work as documented.
+All 60 requests, across all 3 panels, were run end-to-end through Newman in the realistic dependency order described
+above against a live local instance — full booking → payment → chat → complaint → admin-analytics lifecycle works
+as documented.
 
 ## Auth model
 
