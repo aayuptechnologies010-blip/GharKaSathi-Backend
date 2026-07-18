@@ -284,6 +284,133 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Create Temp Category (for Activate/Deactivate/Delete demo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Temp Test Category\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Separate throwaway category so these demo requests never touch {{categoryId}} (Plumber), which later requests depend on."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let __gksData = {};",
+                  "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                  "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                  "{ const __gksV = __gksSafeGet(__gksData, '_id'); if (__gksV !== undefined) { pm.environment.set('tempCategoryId', __gksV); pm.collectionVariables.set('tempCategoryId', __gksV); console.log('Saved tempCategoryId =', __gksV); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deactivate Category (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{tempCategoryId}}/deactivate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{tempCategoryId}}",
+                "deactivate"
+              ]
+            },
+            "description": "Hides it from the public GET /api/categories list, but it still shows in GET /api/admin/categories."
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Category (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{tempCategoryId}}/activate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{tempCategoryId}}",
+                "activate"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/categories/{{tempCategoryId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "categories",
+                "{{tempCategoryId}}"
+              ]
+            },
+            "description": "Hard-deletes only if no provider offers it and no booking references it — otherwise returns 409 and tells you to deactivate instead."
+          },
+          "response": []
         }
       ]
     },
@@ -1676,6 +1803,11 @@
     },
     {
       "key": "categoryId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tempCategoryId",
       "value": "",
       "type": "string"
     },

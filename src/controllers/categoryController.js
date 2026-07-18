@@ -1,4 +1,6 @@
 const Category = require('../models/Category');
+const ServiceProvider = require('../models/ServiceProvider');
+const Booking = require('../models/Booking');
 const asyncHandler = require('../utils/asyncHandler');
 
 // GET /api/categories (public)
@@ -48,4 +50,55 @@ const updateCategory = asyncHandler(async (req, res) => {
   res.json(category);
 });
 
-module.exports = { listCategories, listAllCategoriesAdmin, createCategory, updateCategory };
+// PUT /api/categories/:id/activate (admin)
+const activateCategory = asyncHandler(async (req, res) => {
+  const category = await Category.findByIdAndUpdate(req.params.id, { isActive: true }, { new: true });
+  if (!category) {
+    return res.status(404).json({ message: 'Category not found' });
+  }
+  res.json(category);
+});
+
+// PUT /api/categories/:id/deactivate (admin)
+const deactivateCategory = asyncHandler(async (req, res) => {
+  const category = await Category.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+  if (!category) {
+    return res.status(404).json({ message: 'Category not found' });
+  }
+  res.json(category);
+});
+
+// DELETE /api/categories/:id (admin)
+// Hard-deletes only if nothing references this category — providers offering it, or past bookings
+// under it — since deleting a category still in use would orphan those records and break booking
+// history / analytics. In that case, deactivate instead (hides it from public listing/search).
+const deleteCategory = asyncHandler(async (req, res) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) {
+    return res.status(404).json({ message: 'Category not found' });
+  }
+
+  const [providerCount, bookingCount] = await Promise.all([
+    ServiceProvider.countDocuments({ categories: category._id }),
+    Booking.countDocuments({ category: category._id }),
+  ]);
+
+  if (providerCount > 0 || bookingCount > 0) {
+    return res.status(409).json({
+      message: `Cannot delete: ${providerCount} provider(s) and ${bookingCount} booking(s) reference this category. Deactivate it instead.`,
+    });
+  }
+
+  await category.deleteOne();
+  res.json({ message: 'Category deleted' });
+});
+
+module.exports = {
+  listCategories,
+  listAllCategoriesAdmin,
+  createCategory,
+  updateCategory,
+  activateCategory,
+  deactivateCategory,
+  deleteCategory,
+};
