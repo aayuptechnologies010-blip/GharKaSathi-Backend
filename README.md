@@ -25,7 +25,7 @@ use a Firebase test phone number from a client app, or seed a test User/ServiceP
 hand-craft a JWT the way this was validated during development (see `src/utils/generateToken.js`).
 
 This collection was run end-to-end through Newman (`npx newman run postman_collection.json -e postman_environment.json`)
-against a live local instance — all 51 requests, including the full booking → payment → chat → complaint →
+against a live local instance — all 55 requests, including the full booking → payment → chat → complaint →
 admin-analytics lifecycle, work as documented.
 
 ## Auth model
@@ -55,7 +55,7 @@ Suspended accounts (`isActive: false`, set by admin) are rejected at the auth mi
 | Payments | `POST /api/payments/create-order` (user, Razorpay), `POST /api/payments/verify` (user), `POST /api/payments/cash` (provider records cash collection) — both paths split the booking price into provider payout vs. platform commission per the category's `commissionPercent`, then credit provider earnings |
 | Chat | `GET/POST /api/chat/:bookingId` (user or assigned provider) — messages also broadcast in real time over Socket.io to room `booking:<id>`; connect with `auth: { token: <JWT> }` and emit `join-booking`/`leave-booking` |
 | Complaints | `POST /api/complaints`, `GET /api/complaints/my` (user) |
-| Admin | `GET /api/admin/providers?approved=`, `PUT /api/admin/providers/:id/approve\|suspend\|reinstate`, `GET /api/admin/users`, `PUT /api/admin/users/:id/suspend\|reinstate`, `GET /api/admin/complaints?status=`, `PUT /api/admin/complaints/:id/resolve`, `GET /api/admin/payments`, `GET /api/admin/payments/summary`, `GET /api/admin/analytics` |
+| Admin | `GET/PUT /api/admin/me` (own profile), `PUT /api/admin/me/password`, `GET /api/admin/providers?approved=`, `PUT /api/admin/providers/:id/approve\|suspend\|reinstate`, `GET /api/admin/users`, `PUT /api/admin/users/:id/suspend\|reinstate`, `GET /api/admin/complaints?status=`, `PUT /api/admin/complaints/:id/resolve`, `GET /api/admin/payments`, `GET /api/admin/payments/summary`, `GET /api/admin/analytics` |
 
 Provider onboarding flow: client verifies OTP → `PUT /api/providers/me` sets name/categories/address/documents
 → admin approves via `PUT /api/admin/providers/:id/approve` → provider becomes searchable/bookable.

@@ -12,10 +12,15 @@ const {
 const { getComplaints, resolveComplaint } = require('../controllers/adminComplaintController');
 const { getPayments, getPaymentSummary, getAnalytics } = require('../controllers/adminReportController');
 const { listAllCategoriesAdmin } = require('../controllers/categoryController');
+const { getMe, updateMe, updatePassword } = require('../controllers/adminProfileController');
 
 const router = express.Router();
 
 router.use(protect('admin'));
+
+router.get('/me', getMe);
+router.put('/me', updateMe);
+router.put('/me/password', updatePassword);
 
 router.get('/categories', listAllCategoriesAdmin);
 
