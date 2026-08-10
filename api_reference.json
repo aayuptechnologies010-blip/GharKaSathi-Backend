@@ -1,0 +1,111 @@
+{
+  "project": "Ghar Ka Sathi Backend",
+  "description": "Full inventory of every API endpoint, grouped by which panel/app consumes it. 'status' marks whether the endpoint existed before this update, is brand new, or had its behavior changed.",
+  "statusLegend": {
+    "existing": "Was already working before this update — unchanged",
+    "new": "Did not exist before this update",
+    "updated": "Existed before, but its behavior changed in this update"
+  },
+  "baseUrl": {
+    "local": "http://localhost:5000",
+    "live": "https://gharkasathi-backend.onrender.com"
+  },
+  "sharedAndAuth": {
+    "description": "Health check and login/OTP endpoints used by both the User app and the Service Provider app.",
+    "endpoints": [
+      { "method": "GET", "path": "/health", "name": "Health Check", "auth": "public", "status": "existing", "description": "Liveness check, returns {status:'ok'}." },
+      { "method": "POST", "path": "/api/auth/check-mobile", "name": "Check Mobile Before OTP", "auth": "public", "status": "existing", "description": "Body: {phone, role}. Tells the client if this number is already registered, before the OTP is even sent. Never creates anything." },
+      { "method": "POST", "path": "/api/auth/send-otp", "name": "Send OTP", "auth": "public", "status": "new", "description": "Body: {phone, role}. Generates and stores a one-time code. No SMS gateway is configured yet, so outside production the response also includes {devOtp} (and logs it) so the flow is testable end-to-end. Replaces the old Firebase phone-auth requirement entirely." },
+      { "method": "POST", "path": "/api/auth/verify-otp", "name": "Verify OTP (Login/Register)", "auth": "public", "status": "updated", "description": "Body: {phone, role, otp, name?}. Verifies the code from Send OTP, then finds-or-creates the User/ServiceProvider and returns a JWT. Used to always require a Firebase idToken and would 500 in production because Firebase Admin was never configured — that dependency is now removed." },
+      { "method": "POST", "path": "/api/auth/admin/login", "name": "Admin Login", "auth": "public", "status": "existing", "description": "Body: {email, password}. Email/password login for the seeded admin account, returns a JWT." }
+    ]
+  },
+  "userPanel": {
+    "description": "Endpoints consumed by the customer-facing (User) app.",
+    "endpoints": [
+      { "method": "GET", "path": "/api/users/me", "name": "Get My Profile", "auth": "user", "status": "existing", "description": "Returns the logged-in user's full profile document." },
+      { "method": "PUT", "path": "/api/users/me", "name": "Update My Profile", "auth": "user", "status": "existing", "description": "Body: {name?, email?, gender?, dob?, city?, state?, pincode?, profileImage?}. Used for both edit-profile and first-time profile completion." },
+      { "method": "PUT", "path": "/api/users/me/location", "name": "Update My Address/Location", "auth": "user", "status": "updated", "description": "Body: {text, lat?, lng?}. lat/lng are now optional — the mobile app has no GPS, so most calls only ever send text. If either coordinate is provided, both must be valid." },
+      { "method": "GET", "path": "/api/users/me/addresses", "name": "Get Saved Addresses", "auth": "user", "status": "existing", "description": "Returns the plain string[] list shown in the address picker." },
+      { "method": "POST", "path": "/api/users/me/addresses", "name": "Add Saved Address", "auth": "user", "status": "existing", "description": "Body: {address}. Idempotent — adding the same text twice is a no-op." },
+      { "method": "DELETE", "path": "/api/users/me/addresses", "name": "Delete Saved Address", "auth": "user", "status": "existing", "description": "Body: {address}. Matches by exact text." },
+      { "method": "GET", "path": "/api/categories", "name": "List Categories", "auth": "public", "status": "existing", "description": "Active categories only, each with its subServices array — the \"what service do you need\" list." },
+      { "method": "GET", "path": "/api/providers/search", "name": "Search Providers", "auth": "public", "status": "updated", "description": "Query: categoryId?, lat?, lng?, radiusKm?. Only approved+available providers. When lat/lng are passed, each result now includes a computed distanceKm (Haversine) — this field did not exist before." },
+      { "method": "GET", "path": "/api/providers/:id", "name": "Get Provider Profile", "auth": "public", "status": "existing", "description": "Full public profile for one provider, shown on the provider profile screen." },
+      { "method": "GET", "path": "/api/providers/:id/reviews", "name": "Get Provider Reviews", "auth": "public", "status": "new", "description": "Reviews left for this provider, newest first — did not exist before." },
+      { "method": "POST", "path": "/api/bookings", "name": "Create Booking", "auth": "user", "status": "existing", "description": "Body: {providerId, categoryId, subServiceId?, scheduledAt, timeSlot?, address?, notes?, couponCode?}. Applies SGSAVE30/FIRST99/CLEANPRO coupon logic and computes discount/tax/finalAmount server-side." },
+      { "method": "GET", "path": "/api/bookings/my", "name": "My Booking History", "auth": "user", "status": "existing", "description": "All of the logged-in user's bookings, newest first." },
+      { "method": "GET", "path": "/api/bookings/:id", "name": "Track Booking", "auth": "user or provider", "status": "existing", "description": "Single booking detail — also usable by the assigned provider." },
+      { "method": "PUT", "path": "/api/bookings/:id/cancel", "name": "Cancel Booking", "auth": "user", "status": "existing", "description": "Only valid while status is pending/broadcasted/accepted." },
+      { "method": "POST", "path": "/api/bookings/:id/review", "name": "Rate & Review", "auth": "user", "status": "existing", "description": "Body: {rating, comment?}. Only valid once the booking is completed/paid; updates the provider's rating average." },
+      { "method": "POST", "path": "/api/payments/create-order", "name": "Create Razorpay Order", "auth": "user", "status": "existing", "description": "Body: {bookingId}. Requires RAZORPAY_KEY_ID/SECRET to be configured — returns 503 until they are." },
+      { "method": "POST", "path": "/api/payments/verify", "name": "Verify Razorpay Payment", "auth": "user", "status": "existing", "description": "Body: {razorpayOrderId, razorpayPaymentId, razorpaySignature} from the Razorpay Checkout callback." },
+      { "method": "GET", "path": "/api/chat/:bookingId", "name": "Get Chat Messages", "auth": "user or provider", "status": "existing", "description": "Full message history for a booking." },
+      { "method": "POST", "path": "/api/chat/:bookingId", "name": "Send Chat Message", "auth": "user or provider", "status": "existing", "description": "Body: {text, imageUrl?}. Also broadcast live over Socket.io to room booking:<id> as event 'message'." },
+      { "method": "GET", "path": "/api/notifications", "name": "Get My Notifications", "auth": "user", "status": "existing", "description": "Newest first. Also pushed live over Socket.io to room account:<userId> as event 'notification' — that socket push is new (see realtime section)." },
+      { "method": "PUT", "path": "/api/notifications/:id/read", "name": "Mark Notification As Read", "auth": "user", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/notifications/read-all", "name": "Mark All Notifications As Read", "auth": "user", "status": "existing", "description": "" },
+      { "method": "DELETE", "path": "/api/notifications/:id", "name": "Delete Notification", "auth": "user", "status": "existing", "description": "" },
+      { "method": "DELETE", "path": "/api/notifications", "name": "Clear All Notifications", "auth": "user", "status": "existing", "description": "Deletes every notification for this user." },
+      { "method": "POST", "path": "/api/complaints", "name": "File Complaint", "auth": "user", "status": "existing", "description": "Body: {bookingId?, subject, description}." },
+      { "method": "GET", "path": "/api/complaints/my", "name": "My Complaints", "auth": "user", "status": "existing", "description": "" }
+    ]
+  },
+  "serviceProviderPanel": {
+    "description": "Endpoints consumed by the Service Provider app.",
+    "endpoints": [
+      { "method": "GET", "path": "/api/providers/me", "name": "Get My Provider Profile", "auth": "provider", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/providers/me", "name": "Update My Provider Profile", "auth": "provider", "status": "existing", "description": "Body: {name?, email?, profileImage?, categories?, documents?, bio?, skills?, languages?, experienceYears?, baseHourlyRate?, address?}. categories must be valid, active Category ids." },
+      { "method": "PUT", "path": "/api/providers/me/location", "name": "Update My Location", "auth": "provider", "status": "existing", "description": "Body: {text, lat, lng} — lat/lng still required here (drives the geo-search $near query), unlike the User panel's version of this endpoint." },
+      { "method": "PUT", "path": "/api/providers/me/availability", "name": "Update Availability", "auth": "provider", "status": "existing", "description": "Body: {isAvailable}." },
+      { "method": "GET", "path": "/api/providers/me/earnings", "name": "Get My Earnings", "auth": "provider", "status": "existing", "description": "" },
+      { "method": "GET", "path": "/api/bookings/provider", "name": "My Bookings (Order Receive)", "auth": "provider", "status": "existing", "description": "Query: status? (optional filter)." },
+      { "method": "PUT", "path": "/api/bookings/:id/status", "name": "Update Booking Status", "auth": "provider", "status": "updated", "description": "Body: {status, price?}. Valid transitions: accepted/rejected/on-the-way/reached/started/completed. Now also pushes the update live over Socket.io to room booking:<id> as event 'booking-status', and pushes the resulting notification to room account:<userId> as event 'notification' — both socket pushes are new." },
+      { "method": "POST", "path": "/api/payments/cash", "name": "Mark Cash Payment Received", "auth": "provider", "status": "existing", "description": "Body: {bookingId}. Booking must be status 'completed' first; splits the price into commission + payout and credits provider earnings." },
+      { "method": "GET", "path": "/api/chat/:bookingId", "name": "Get Chat Messages (Provider side)", "auth": "user or provider", "status": "existing", "description": "Same endpoint as User Panel." },
+      { "method": "POST", "path": "/api/chat/:bookingId", "name": "Send Chat Message (Provider side)", "auth": "user or provider", "status": "existing", "description": "Same endpoint as User Panel." }
+    ]
+  },
+  "adminPanel": {
+    "description": "Endpoints consumed by the internal Admin panel.",
+    "endpoints": [
+      { "method": "GET", "path": "/api/admin/me", "name": "Get My Admin Profile", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/admin/me", "name": "Update My Admin Profile", "auth": "admin", "status": "existing", "description": "Body: {name?}." },
+      { "method": "PUT", "path": "/api/admin/me/password", "name": "Change My Password", "auth": "admin", "status": "existing", "description": "Body: {currentPassword, newPassword}." },
+      { "method": "GET", "path": "/api/admin/categories", "name": "List All Categories (incl. inactive)", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "POST", "path": "/api/categories", "name": "Create Category", "auth": "admin", "status": "existing", "description": "Body: {name, icon?, description?, commissionPercent?}." },
+      { "method": "PUT", "path": "/api/categories/:id", "name": "Update Category / Set Commission", "auth": "admin", "status": "existing", "description": "Body: {name?, icon?, description?, isActive?, commissionPercent?}." },
+      { "method": "PUT", "path": "/api/categories/:id/activate", "name": "Activate Category", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/categories/:id/deactivate", "name": "Deactivate Category", "auth": "admin", "status": "existing", "description": "Hides it from the public list without deleting it." },
+      { "method": "DELETE", "path": "/api/categories/:id", "name": "Delete Category", "auth": "admin", "status": "existing", "description": "Hard-deletes only if no provider/booking references it — otherwise 409, deactivate instead." },
+      { "method": "POST", "path": "/api/categories/:id/sub-services", "name": "Add Sub-Service", "auth": "admin", "status": "existing", "description": "Body: {name, description?, basePrice}." },
+      { "method": "PUT", "path": "/api/categories/:id/sub-services/:subId", "name": "Update Sub-Service", "auth": "admin", "status": "existing", "description": "Body: any of {name?, description?, basePrice?}." },
+      { "method": "DELETE", "path": "/api/categories/:id/sub-services/:subId", "name": "Delete Sub-Service", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "GET", "path": "/api/admin/providers", "name": "List Providers (Approval Queue)", "auth": "admin", "status": "existing", "description": "Query: approved? (true/false to filter, omit for all)." },
+      { "method": "PUT", "path": "/api/admin/providers/:id/approve", "name": "Approve Provider", "auth": "admin", "status": "existing", "description": "Required before any user can search for or book this provider." },
+      { "method": "PUT", "path": "/api/admin/providers/:id/suspend", "name": "Suspend Provider", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/admin/providers/:id/reinstate", "name": "Reinstate Provider", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "GET", "path": "/api/admin/users", "name": "List Users", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/admin/users/:id/suspend", "name": "Suspend User", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "PUT", "path": "/api/admin/users/:id/reinstate", "name": "Reinstate User", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "GET", "path": "/api/admin/complaints", "name": "List Complaints", "auth": "admin", "status": "existing", "description": "Query: status? (open/in-progress/resolved/rejected)." },
+      { "method": "PUT", "path": "/api/admin/complaints/:id/resolve", "name": "Resolve Complaint", "auth": "admin", "status": "existing", "description": "Body: {status, adminNote?}." },
+      { "method": "GET", "path": "/api/admin/payments", "name": "Payment Reports", "auth": "admin", "status": "existing", "description": "Query: status?, from?, to?." },
+      { "method": "GET", "path": "/api/admin/payments/summary", "name": "Payment Summary (Commission Earned)", "auth": "admin", "status": "existing", "description": "" },
+      { "method": "GET", "path": "/api/admin/analytics", "name": "Analytics Dashboard", "auth": "admin", "status": "existing", "description": "Users/providers counts, bookings by status, top categories, revenue and commission totals." }
+    ]
+  },
+  "realtime": {
+    "description": "Socket.io events. Connect to the server root (not the /api prefix) with auth: {token: <jwt>}.",
+    "clientEmits": [
+      { "event": "join-booking", "payload": "bookingId (string)", "description": "Joins room booking:<id> — only succeeds if the connected account owns or is assigned to that booking." },
+      { "event": "leave-booking", "payload": "bookingId (string)", "description": "Leaves that room." }
+    ],
+    "serverEmits": [
+      { "event": "message", "room": "booking:<id>", "status": "existing", "description": "A new chat message, same shape as GET /api/chat/:bookingId items." },
+      { "event": "booking-status", "room": "booking:<id>", "status": "new", "description": "The full updated booking document, fired whenever a provider changes its status." },
+      { "event": "notification", "room": "account:<userId>", "status": "new", "description": "A new notification document, fired whenever one is created (currently: booking status changes). Every authenticated socket auto-joins its own account:<id> room on connect." },
+      { "event": "error", "room": "n/a", "status": "existing", "description": "Emitted then the socket is disconnected if the JWT is missing/invalid." }
+    ]
+  }
+}
