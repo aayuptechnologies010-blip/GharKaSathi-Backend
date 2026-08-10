@@ -1,17 +1,22 @@
 const Booking = require('../models/Booking');
 const ServiceProvider = require('../models/ServiceProvider');
 const Review = require('../models/Review');
+const Notification = require('../models/Notification');
 const asyncHandler = require('../utils/asyncHandler');
+const { bookingRoom, userRoom } = require('../socket');
 
-const ACTIVE_STATUSES = ['pending', 'accepted', 'in-progress'];
+const CANCELLABLE_STATUSES = ['pending', 'broadcasted', 'accepted'];
 
 // Which statuses a provider may move a booking to, given its current status.
 // Without this, a booking already completed/rejected/cancelled could be flipped to any other
 // status (e.g. "reject" a booking that was already completed, paid and reviewed).
 const STATUS_TRANSITIONS = {
-  pending: ['accepted', 'rejected'],
-  accepted: ['in-progress', 'rejected'],
-  'in-progress': ['completed'],
+  pending: ['broadcasted', 'accepted', 'rejected', 'cancelled'],
+  broadcasted: ['accepted', 'rejected', 'cancelled'],
+  accepted: ['on-the-way', 'rejected'],
+  'on-the-way': ['reached'],
+  reached: ['started'],
+  started: ['completed'],
   completed: [],
   rejected: [],
   cancelled: [],
@@ -19,7 +24,7 @@ const STATUS_TRANSITIONS = {
 
 // POST /api/bookings (user)
 const createBooking = asyncHandler(async (req, res) => {
-  const { providerId, categoryId, scheduledAt, address, notes } = req.body;
+  const { providerId, categoryId, subServiceId, scheduledAt, timeSlot, address, notes, couponCode } = req.body;
 
   if (!providerId || !categoryId || !scheduledAt) {
     return res.status(400).json({ message: 'providerId, categoryId and scheduledAt are required' });
@@ -33,13 +38,52 @@ const createBooking = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'This provider does not offer the selected category' });
   }
 
+  const Category = require('../models/Category');
+  const category = await Category.findOne({ _id: categoryId, isActive: true });
+  if (!category) {
+    return res.status(400).json({ message: 'Selected category is not available' });
+  }
+
+  let subService = null;
+  if (subServiceId) {
+    subService = category.subServices.id(subServiceId);
+    if (!subService) {
+      return res.status(400).json({ message: 'Selected sub-service does not belong to this category' });
+    }
+  }
+
+  const scheduledDate = new Date(scheduledAt);
+  if (Number.isNaN(scheduledDate.getTime())) {
+    return res.status(400).json({ message: 'scheduledAt must be a valid date' });
+  }
+
+  // Coupon discount logic (mirrors app: SGSAVE30=30%, FIRST99=20%, CLEANPRO=18%)
+  const COUPONS = { SGSAVE30: 0.3, FIRST99: 0.2, CLEANPRO: 0.18 };
+  const basePrice = subService ? subService.basePrice : null;
+  let discount = 0;
+  let tax = 0;
+  let finalAmount = null;
+
+  if (basePrice != null) {
+    const discountRate = couponCode ? (COUPONS[couponCode.toUpperCase()] || 0) : 0;
+    discount = basePrice * discountRate;
+    tax = (basePrice - discount) * 0.18;
+    finalAmount = basePrice - discount + tax;
+  }
+
   const booking = await Booking.create({
     user: req.account._id,
     provider: providerId,
     category: categoryId,
-    scheduledAt,
+    subService: subService ? { name: subService.name, description: subService.description, basePrice: subService.basePrice } : undefined,
+    timeSlot,
+    scheduledAt: scheduledDate,
     address,
     notes,
+    couponCode: couponCode ? couponCode.toUpperCase() : undefined,
+    discount,
+    tax,
+    finalAmount,
   });
 
   res.status(201).json(booking);
@@ -71,7 +115,7 @@ const getProviderBookings = asyncHandler(async (req, res) => {
 // When accepting, the provider can attach a price quote for the user to pay.
 const updateBookingStatus = asyncHandler(async (req, res) => {
   const { status, price } = req.body;
-  const allowed = ['accepted', 'rejected', 'in-progress', 'completed'];
+  const allowed = ['accepted', 'rejected', 'on-the-way', 'reached', 'started', 'completed'];
 
   if (!allowed.includes(status)) {
     return res.status(400).json({ message: `status must be one of: ${allowed.join(', ')}` });
@@ -99,6 +143,29 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
 
   booking.status = status;
   await booking.save();
+
+  const io = req.app.get('io');
+  io?.to(bookingRoom(booking._id.toString())).emit('booking-status', booking);
+
+  // Push notification to user on key status changes
+  const notifMap = {
+    accepted: { title: 'Booking Confirmed!', body: 'A provider has accepted your booking request.' },
+    'on-the-way': { title: 'Partner is Traveling', body: 'Your service partner has started traveling to your address.' },
+    reached: { title: 'Partner Arrived!', body: 'Your service partner has arrived at your location.' },
+    started: { title: 'Service Started', body: 'Work has successfully started at your location.' },
+    completed: { title: 'Service Completed!', body: 'Please authorize the payment and rate your service partner.' },
+  };
+  if (notifMap[status]) {
+    const notif = await Notification.create({
+      user: booking.user,
+      title: notifMap[status].title,
+      body: notifMap[status].body,
+      routeType: 'booking',
+      routeId: booking._id.toString(),
+    });
+    io?.to(userRoom(booking.user.toString())).emit('notification', notif);
+  }
+
   res.json(booking);
 });
 
@@ -126,7 +193,7 @@ const cancelBooking = asyncHandler(async (req, res) => {
     return res.status(404).json({ message: 'Booking not found' });
   }
 
-  if (!ACTIVE_STATUSES.includes(booking.status)) {
+  if (!CANCELLABLE_STATUSES.includes(booking.status)) {
     return res.status(400).json({ message: `Cannot cancel a booking that is ${booking.status}` });
   }
 
@@ -147,8 +214,13 @@ const addReview = asyncHandler(async (req, res) => {
   if (!booking) {
     return res.status(404).json({ message: 'Booking not found' });
   }
-  if (booking.status !== 'completed') {
-    return res.status(400).json({ message: 'Can only review a completed booking' });
+  if (!['completed', 'paid'].includes(booking.status)) {
+    return res.status(400).json({ message: 'Can only review a completed or paid booking' });
+  }
+
+  const existing = await Review.findOne({ booking: booking._id });
+  if (existing) {
+    return res.status(400).json({ message: 'You have already reviewed this booking' });
   }
 
   const review = await Review.create({
@@ -163,10 +235,14 @@ const addReview = asyncHandler(async (req, res) => {
   const newCount = provider.ratingCount + 1;
   const newAvg = (provider.ratingAvg * provider.ratingCount + rating) / newCount;
   provider.ratingCount = newCount;
-  provider.ratingAvg = newAvg;
+  provider.ratingAvg = parseFloat(newAvg.toFixed(2));
+  provider.completedJobs = (provider.completedJobs || 0) + 1;
   await provider.save();
 
-  res.status(201).json(review);
+  booking.status = 'reviewed';
+  await booking.save();
+
+  res.status(201).json({ review, booking });
 });
 
 module.exports = {

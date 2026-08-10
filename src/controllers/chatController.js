@@ -24,7 +24,7 @@ const getMessages = asyncHandler(async (req, res) => {
 
 // POST /api/chat/:bookingId
 const sendMessage = asyncHandler(async (req, res) => {
-  const { text } = req.body;
+  const { text, imageUrl } = req.body;
   if (!text || !text.trim()) {
     return res.status(400).json({ message: 'text is required' });
   }
@@ -38,6 +38,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     booking: booking._id,
     senderRole: req.role,
     text: text.trim(),
+    imageUrl: imageUrl || undefined,
   });
 
   req.app.get('io')?.to(bookingRoom(booking._id.toString())).emit('message', message);

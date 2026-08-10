@@ -69,9 +69,7 @@ const deactivateCategory = asyncHandler(async (req, res) => {
 });
 
 // DELETE /api/categories/:id (admin)
-// Hard-deletes only if nothing references this category — providers offering it, or past bookings
-// under it — since deleting a category still in use would orphan those records and break booking
-// history / analytics. In that case, deactivate instead (hides it from public listing/search).
+// Hard-deletes only if nothing references this category
 const deleteCategory = asyncHandler(async (req, res) => {
   const category = await Category.findById(req.params.id);
   if (!category) {
@@ -93,6 +91,50 @@ const deleteCategory = asyncHandler(async (req, res) => {
   res.json({ message: 'Category deleted' });
 });
 
+// POST /api/categories/:id/sub-services (admin)
+const addSubService = asyncHandler(async (req, res) => {
+  const { name, description, basePrice } = req.body;
+  if (!name || basePrice === undefined) {
+    return res.status(400).json({ message: 'name and basePrice are required' });
+  }
+  const category = await Category.findById(req.params.id);
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+
+  category.subServices.push({ name, description, basePrice });
+  await category.save();
+  res.status(201).json(category);
+});
+
+// PUT /api/categories/:id/sub-services/:subId (admin)
+const updateSubService = asyncHandler(async (req, res) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+
+  const sub = category.subServices.id(req.params.subId);
+  if (!sub) return res.status(404).json({ message: 'Sub-service not found' });
+
+  const { name, description, basePrice } = req.body;
+  if (name !== undefined) sub.name = name;
+  if (description !== undefined) sub.description = description;
+  if (basePrice !== undefined) sub.basePrice = basePrice;
+
+  await category.save();
+  res.json(category);
+});
+
+// DELETE /api/categories/:id/sub-services/:subId (admin)
+const deleteSubService = asyncHandler(async (req, res) => {
+  const category = await Category.findById(req.params.id);
+  if (!category) return res.status(404).json({ message: 'Category not found' });
+
+  const sub = category.subServices.id(req.params.subId);
+  if (!sub) return res.status(404).json({ message: 'Sub-service not found' });
+
+  sub.deleteOne();
+  await category.save();
+  res.json(category);
+});
+
 module.exports = {
   listCategories,
   listAllCategoriesAdmin,
@@ -101,4 +143,7 @@ module.exports = {
   activateCategory,
   deactivateCategory,
   deleteCategory,
+  addSubService,
+  updateSubService,
+  deleteSubService,
 };

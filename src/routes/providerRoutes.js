@@ -7,11 +7,15 @@ const {
   searchProviders,
   updateAvailability,
   getEarnings,
+  getProviderById,
+  getProviderReviews,
 } = require('../controllers/providerController');
 
 const router = express.Router();
 
 router.get('/search', searchProviders);
+router.get('/:id([0-9a-fA-F]{24})', getProviderById);
+router.get('/:id([0-9a-fA-F]{24})/reviews', getProviderReviews);
 
 router.use(protect('provider'));
 router.get('/me', getMe);

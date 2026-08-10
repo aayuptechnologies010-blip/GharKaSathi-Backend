@@ -5,6 +5,10 @@ function bookingRoom(bookingId) {
   return `booking:${bookingId}`;
 }
 
+function userRoom(accountId) {
+  return `account:${accountId}`;
+}
+
 function initSocket(io) {
   io.on('connection', (socket) => {
     let account = null; // { id, role }
@@ -24,6 +28,8 @@ function initSocket(io) {
       return;
     }
 
+    socket.join(userRoom(account.id));
+
     socket.on('join-booking', async (bookingId) => {
       const filter = account.role === 'provider' ? { _id: bookingId, provider: account.id } : { _id: bookingId, user: account.id };
       const booking = await Booking.findOne(filter);
@@ -40,4 +46,4 @@ function initSocket(io) {
   });
 }
 
-module.exports = { initSocket, bookingRoom };
+module.exports = { initSocket, bookingRoom, userRoom };
