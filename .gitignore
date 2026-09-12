@@ -3,3 +3,5 @@ node_modules/
 npm-debug.log
 .claude/
 gharkasathi-userApp-main/
+
+/src/generated/prisma

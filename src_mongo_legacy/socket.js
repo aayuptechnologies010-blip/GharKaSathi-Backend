@@ -5,6 +5,10 @@ function bookingRoom(bookingId) {
   return `booking:${bookingId}`;
 }
 
+function userRoom(userId) {
+  return `user:${userId}`;
+}
+
 function userRoom(accountId) {
   return `account:${accountId}`;
 }
@@ -45,6 +49,11 @@ function initSocket(io) {
     socket.on('leave-booking', (bookingId) => {
       socket.leave(bookingRoom(bookingId));
     });
+
+    // User joins their personal room for real-time notifications
+    if (account.role === 'user') {
+      socket.join(userRoom(account.id));
+    }
   });
 }
 

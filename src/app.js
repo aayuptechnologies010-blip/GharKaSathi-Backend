@@ -1,37 +1,39 @@
 const express = require('express');
 const cors = require('cors');
-const { notFound, errorHandler } = require('./middleware/errorHandler');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const providerRoutes = require('./routes/providerRoutes');
-const categoryRoutes = require('./routes/categoryRoutes');
-const bookingRoutes = require('./routes/bookingRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const complaintRoutes = require('./routes/complaintRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const adminRoutes = require('./routes/adminRoutes');
+// Routes
+const v1Routes = require('./routes/v1');
+const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use(cors());
+// Security middlewares
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes'
+});
+app.use(limiter);
+
+// Parse JSON bodies
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
+// API Routes
+app.use('/api', v1Routes);
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/providers', providerRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/bookings', bookingRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/complaints', complaintRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/admin', adminRoutes);
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'UP', message: 'Ghar Ka Sathi Provider API is running' });
+});
 
-app.use(notFound);
+// Error handling middleware
 app.use(errorHandler);
 
 module.exports = app;

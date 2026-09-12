@@ -311,6 +311,87 @@ const addReview = asyncHandler(async (req, res) => {
   res.status(201).json({ review, booking });
 });
 
+// PUT /api/bookings/:id/start-job (provider) — starts timer when provider begins work
+const startJob = asyncHandler(async (req, res) => {
+  const booking = await Booking.findOne({ _id: req.params.id, provider: req.account._id });
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (booking.status !== 'reached') {
+    return res.status(400).json({ message: 'Provider must have reached location before starting job' });
+  }
+
+  // Default checklist from image: Cleaning, Mopping, Dusting, Others
+  const defaultChecklist = req.body.checklist || ['Cleaning', 'Mopping', 'Dusting', 'Others'];
+
+  booking.status = 'started';
+  booking.jobStartedAt = new Date();
+  booking.workChecklist = defaultChecklist.map((item) => ({ item, done: false }));
+  await booking.save();
+
+  const io = req.app.get('io');
+  io?.to(bookingRoom(booking._id.toString())).emit('booking-status', booking);
+
+  const notif = await Notification.create({
+    user: booking.user,
+    title: 'Service Started',
+    body: 'Work has successfully started at your location.',
+    routeType: 'booking',
+    routeId: booking._id.toString(),
+  });
+  io?.to(userRoom(booking.user.toString())).emit('notification', notif);
+
+  res.json(booking);
+});
+
+// PUT /api/bookings/:id/checklist (provider) — tick/untick checklist items
+const updateChecklist = asyncHandler(async (req, res) => {
+  const { itemIndex, done } = req.body;
+  const booking = await Booking.findOne({ _id: req.params.id, provider: req.account._id });
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (booking.status !== 'started') {
+    return res.status(400).json({ message: 'Job must be in started status' });
+  }
+  if (itemIndex === undefined || !booking.workChecklist[itemIndex]) {
+    return res.status(400).json({ message: 'Invalid itemIndex' });
+  }
+
+  booking.workChecklist[itemIndex].done = Boolean(done);
+  booking.markModified('workChecklist');
+  await booking.save();
+  res.json(booking);
+});
+
+// PUT /api/bookings/:id/complete-job (provider) — completes job, saves elapsed time
+const completeJob = asyncHandler(async (req, res) => {
+  const booking = await Booking.findOne({ _id: req.params.id, provider: req.account._id });
+  if (!booking) return res.status(404).json({ message: 'Booking not found' });
+  if (booking.status !== 'started') {
+    return res.status(400).json({ message: 'Job must be in started status to complete' });
+  }
+  if (!booking.price && !booking.finalAmount) {
+    return res.status(400).json({ message: 'Set a price before completing the job' });
+  }
+
+  if (booking.jobStartedAt) {
+    booking.jobElapsedSeconds = Math.floor((Date.now() - booking.jobStartedAt.getTime()) / 1000);
+  }
+  booking.status = 'completed';
+  await booking.save();
+
+  const io = req.app.get('io');
+  io?.to(bookingRoom(booking._id.toString())).emit('booking-status', booking);
+
+  const notif = await Notification.create({
+    user: booking.user,
+    title: 'Service Completed!',
+    body: 'Please authorize the payment and rate your service partner.',
+    routeType: 'booking',
+    routeId: booking._id.toString(),
+  });
+  io?.to(userRoom(booking.user.toString())).emit('notification', notif);
+
+  res.json(booking);
+});
+
 module.exports = {
   createBooking,
   getMyBookings,
@@ -320,4 +401,7 @@ module.exports = {
   updateBookingStatus,
   cancelBooking,
   addReview,
+  startJob,
+  updateChecklist,
+  completeJob,
 };

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const ServiceProvider = require('../models/ServiceProvider');
 const Booking = require('../models/Booking');
 const Payment = require('../models/Payment');
+const Withdrawal = require('../models/Withdrawal');
 const asyncHandler = require('../utils/asyncHandler');
 
 // GET /api/admin/payments?status=paid&from=2026-01-01&to=2026-12-31
@@ -43,10 +44,17 @@ const getPaymentSummary = asyncHandler(async (req, res) => {
 
 // GET /api/admin/analytics
 const getAnalytics = asyncHandler(async (req, res) => {
-  const [userCount, providerCount, pendingProviderCount, bookingsByStatus, topCategories] = await Promise.all([
+  const [
+    userCount, providerCount, pendingProviderCount,
+    kycSubmittedCount, kycApprovedCount,
+    bookingsByStatus, topCategories,
+    pendingWithdrawals,
+  ] = await Promise.all([
     User.countDocuments({}),
     ServiceProvider.countDocuments({ isApproved: true }),
     ServiceProvider.countDocuments({ isApproved: false }),
+    ServiceProvider.countDocuments({ kycStatus: 'submitted' }),
+    ServiceProvider.countDocuments({ kycStatus: 'approved' }),
     Booking.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
     Booking.aggregate([
       { $group: { _id: '$category', bookings: { $sum: 1 } } },
@@ -56,21 +64,32 @@ const getAnalytics = asyncHandler(async (req, res) => {
       { $unwind: '$category' },
       { $project: { _id: 0, category: '$category.name', bookings: 1 } },
     ]),
+    Withdrawal.aggregate([
+      { $match: { status: 'pending' } },
+      { $group: { _id: null, count: { $sum: 1 }, totalAmount: { $sum: '$amount' } } },
+    ]),
   ]);
 
   const [paymentTotals] = await Payment.aggregate([
     { $match: { status: 'paid' } },
-    { $group: { _id: null, totalRevenue: { $sum: '$amount' }, totalCommission: { $sum: '$commissionAmount' } } },
+    { $group: { _id: null, totalRevenue: { $sum: '$amount' }, totalCommission: { $sum: '$commissionAmount' }, totalPayout: { $sum: '$payoutAmount' } } },
   ]);
 
   res.json({
     users: userCount,
     approvedProviders: providerCount,
     pendingProviders: pendingProviderCount,
+    kycPending: kycSubmittedCount,
+    kycApproved: kycApprovedCount,
     bookingsByStatus: bookingsByStatus.reduce((acc, b) => ({ ...acc, [b._id]: b.count }), {}),
     topCategories,
+    pendingWithdrawals: {
+      count: pendingWithdrawals[0]?.count || 0,
+      totalAmount: pendingWithdrawals[0]?.totalAmount || 0,
+    },
     revenue: paymentTotals?.totalRevenue || 0,
     commissionEarned: paymentTotals?.totalCommission || 0,
+    totalPayout: paymentTotals?.totalPayout || 0,
   });
 });
 

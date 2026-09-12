@@ -44,6 +44,12 @@ const bookingSchema = new mongoose.Schema(
     tax: { type: Number, default: 0 },
     finalAmount: { type: Number },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+    jobStartedAt: { type: Date },
+    jobElapsedSeconds: { type: Number, default: 0 },
+    workChecklist: [{
+      item: { type: String },
+      done: { type: Boolean, default: false },
+    }],
   },
   { timestamps: true }
 );
