@@ -1,30 +1,31 @@
-function notFound(req, res, next) {
-  res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
-}
+const { errorResponse } = require('../utils/response');
 
-function errorHandler(err, req, res, next) {
-  let statusCode = err.statusCode || 500;
-  let message = err.message || 'Server error';
+const errorHandler = (err, req, res, next) => {
+  console.error(err);
 
-  if (err.name === 'CastError') {
-    statusCode = 400;
-    message = 'Invalid id';
+  // Prisma errors
+  if (err.name === 'PrismaClientKnownRequestError') {
+    if (err.code === 'P2002') {
+      return errorResponse(res, 409, 'Resource already exists', 'CONFLICT', { field: err.meta?.target });
+    }
   }
 
-  if (err.code === 11000) {
-    statusCode = 409;
-    const field = Object.keys(err.keyValue || {})[0];
-    message = field ? `${field} already in use` : 'Duplicate value';
+  // Joi validation errors
+  if (err.isJoi) {
+    const details = err.details.map(d => ({ message: d.message, path: d.path }));
+    return errorResponse(res, 400, 'Validation Error', 'VALIDATION_ERROR', details);
   }
 
-  if (err.name === 'ValidationError') {
-    statusCode = 400;
-    message = Object.values(err.errors)
-      .map((e) => e.message)
-      .join(', ');
+  // Custom Application Errors
+  if (err.statusCode) {
+    return errorResponse(res, err.statusCode, err.message, err.errorCode || 'APPLICATION_ERROR');
   }
 
-  res.status(statusCode).json({ message });
-}
+  // Default server error
+  const statusCode = 500;
+  const message = process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message;
+  
+  errorResponse(res, statusCode, message, 'INTERNAL_SERVER_ERROR');
+};
 
-module.exports = { notFound, errorHandler };
+module.exports = errorHandler;

@@ -1,22 +1,30 @@
 require('dotenv').config();
-const http = require('http');
-const { Server } = require('socket.io');
-const app = require('./src/app');
-const connectDB = require('./src/config/db');
-const { initSocket } = require('./src/socket');
+const app = require('./src_mongo_legacy/app');
+const connectDB = require('./src_mongo_legacy/config/db');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
-const httpServer = http.createServer(app);
-const io = new Server(httpServer, { cors: { origin: '*' } });
-initSocket(io);
-app.set('io', io);
-
-connectDB()
-  .then(() => {
-    httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => {
-    console.error('Failed to connect to MongoDB', err);
-    process.exit(1);
+connectDB().then(() => {
+  const server = app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
   });
+
+  // Graceful shutdown
+  process.on('SIGINT', () => {
+    console.log('SIGINT signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+      console.log('HTTP server closed');
+      process.exit(0);
+    });
+  });
+}).catch(err => {
+  console.error('Failed to connect to MongoDB', err);
+});
