@@ -5,6 +5,7 @@ const messageSchema = new mongoose.Schema(
     booking: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true },
     senderRole: { type: String, enum: ['user', 'provider'], required: true },
     text: { type: String, required: true, trim: true },
+    imageUrl: { type: String },
   },
   { timestamps: true }
 );

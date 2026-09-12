@@ -1,12 +1,35 @@
 const mongoose = require('mongoose');
 
-const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in-progress', 'completed', 'cancelled'];
+const BOOKING_STATUSES = [
+  'pending',
+  'broadcasted',
+  'accepted',
+  'rejected',
+  'on-the-way',
+  'reached',
+  'started',
+  'completed',
+  'paid',
+  'reviewed',
+  'cancelled',
+];
+
+const subServiceSnapshotSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    description: { type: String },
+    basePrice: { type: Number, required: true },
+  },
+  { _id: false }
+);
 
 const bookingSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     provider: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceProvider' },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
+    subService: subServiceSnapshotSchema,
+    timeSlot: { type: String },
     status: { type: String, enum: BOOKING_STATUSES, default: 'pending' },
     scheduledAt: { type: Date, required: true },
     address: {
@@ -15,7 +38,11 @@ const bookingSchema = new mongoose.Schema(
       lng: Number,
     },
     notes: { type: String },
+    couponCode: { type: String },
     price: { type: Number },
+    discount: { type: Number, default: 0 },
+    tax: { type: Number, default: 0 },
+    finalAmount: { type: Number },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
   },
   { timestamps: true }

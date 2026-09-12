@@ -9,9 +9,11 @@ const asyncHandler = require('../utils/asyncHandler');
 async function buildPaymentDoc(booking) {
   const category = await Category.findById(booking.category);
   const commissionPercent = category ? category.commissionPercent : 10;
-  const commissionAmount = Math.round((booking.price * commissionPercent) / 100);
-  const payoutAmount = booking.price - commissionAmount;
-  return { commissionPercent, commissionAmount, payoutAmount };
+  // Use finalAmount (set at booking creation with discount+tax) or price (set by provider on accept)
+  const billAmount = booking.finalAmount || booking.price || 0;
+  const commissionAmount = Math.round((billAmount * commissionPercent) / 100);
+  const payoutAmount = billAmount - commissionAmount;
+  return { commissionPercent, commissionAmount, payoutAmount, billAmount };
 }
 
 // POST /api/payments/create-order (user)
@@ -26,7 +28,10 @@ const createOrder = asyncHandler(async (req, res) => {
   if (!booking) {
     return res.status(404).json({ message: 'Booking not found' });
   }
-  if (!booking.price) {
+  if (booking.status !== 'completed') {
+    return res.status(400).json({ message: 'Booking must be completed before payment' });
+  }
+  if (!booking.price && !booking.finalAmount) {
     return res.status(400).json({ message: 'Booking has no price quote yet' });
   }
   if (booking.paymentStatus === 'paid') {
@@ -38,17 +43,17 @@ const createOrder = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Booking is already paid' });
   }
 
-  const { commissionPercent, commissionAmount, payoutAmount } = await buildPaymentDoc(booking);
+  const { commissionPercent, commissionAmount, payoutAmount, billAmount } = await buildPaymentDoc(booking);
 
   const order = await razorpay.orders.create({
-    amount: Math.round(booking.price * 100),
+    amount: Math.round(billAmount * 100),
     currency: 'INR',
     receipt: `booking_${booking._id}`,
   });
 
   if (payment) {
     payment.method = 'razorpay';
-    payment.amount = booking.price;
+    payment.amount = billAmount;
     payment.commissionPercent = commissionPercent;
     payment.commissionAmount = commissionAmount;
     payment.payoutAmount = payoutAmount;
@@ -61,7 +66,7 @@ const createOrder = asyncHandler(async (req, res) => {
       user: booking.user,
       provider: booking.provider,
       method: 'razorpay',
-      amount: booking.price,
+      amount: billAmount,
       commissionPercent,
       commissionAmount,
       payoutAmount,
@@ -106,7 +111,7 @@ const verifyPayment = asyncHandler(async (req, res) => {
   payment.paidAt = new Date();
   await payment.save();
 
-  await Booking.findByIdAndUpdate(payment.booking, { paymentStatus: 'paid' });
+  await Booking.findByIdAndUpdate(payment.booking, { paymentStatus: 'paid', status: 'paid' });
   await ServiceProvider.findByIdAndUpdate(payment.provider, { $inc: { earnings: payment.payoutAmount } });
 
   res.json({ message: 'Payment verified', payment });
@@ -127,7 +132,7 @@ const markCashPaid = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'Booking is already paid' });
   }
 
-  const { commissionPercent, commissionAmount, payoutAmount } = await buildPaymentDoc(booking);
+  const { commissionPercent, commissionAmount, payoutAmount, billAmount } = await buildPaymentDoc(booking);
 
   const payment = await Payment.findOneAndUpdate(
     { booking: booking._id },
@@ -136,7 +141,7 @@ const markCashPaid = asyncHandler(async (req, res) => {
       user: booking.user,
       provider: booking.provider,
       method: 'cash',
-      amount: booking.price,
+      amount: billAmount,
       commissionPercent,
       commissionAmount,
       payoutAmount,
@@ -147,6 +152,7 @@ const markCashPaid = asyncHandler(async (req, res) => {
   );
 
   booking.paymentStatus = 'paid';
+  booking.status = 'paid';
   await booking.save();
   await ServiceProvider.findByIdAndUpdate(req.account._id, { $inc: { earnings: payoutAmount } });
 

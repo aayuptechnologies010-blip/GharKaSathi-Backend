@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1b2c3d4-ghar-ka-saathi-backend",
     "name": "Ghar Ka Sathi — Backend API",
-    "description": "Full API collection for the Ghar Ka Sathi backend, organized into the 3 product panels: Service Provider Panel, User Panel, Admin Panel.\n\nHOW TO USE:\n1. Import this file AND 'postman_environment.json' into Postman, then select the 'Ghar Ka Sathi - Local' environment (top-right dropdown).\n2. Make sure the backend is running (npm run dev) and MONGO_URI points to a live MongoDB.\n\nSUGGESTED RUN ORDER (a booking involves BOTH a provider and a user, so the two panels genuinely interleave — this is the realistic order, not strictly top-to-bottom by folder):\n  1. Service Provider Panel > Registration/Login, then > Setup (Admin Bootstrap) — creates the shared category and admin login used everywhere else.\n  2. Service Provider Panel > Profile Management, then > Admin Approval — provider must be approved before anyone can book them.\n  3. User Panel > Registration/Login, then > Search Services, then > Book Service & Track Booking (creates the booking).\n  4. Service Provider Panel > Order/Booking Receive — accept the quote, mark in-progress, mark completed.\n  5. User Panel > Rate & Review, > Online Payment (or Service Provider Panel > Earnings Dashboard for cash payment), > Chat, > Complaints.\n  6. Admin Panel — can run any time after step 1 for its setup pieces; Resolve Complaint / Payment Reports / Analytics make most sense after step 5.\n3. 'Registration/Login > Check Mobile' is called BEFORE the OTP is even sent — before OTP is even sent — just tells the client if the number is new, never creates anything. 'Verify OTP' runs after the client verifies the OTP with Firebase — it always runs, for both new and existing users, and is what actually logs the user in.\n4. 'Verify OTP' needs a REAL Firebase phone-auth idToken, which you will not have out of the box. Easiest options:\n   a) In Firebase Console > Authentication > Sign-in method > Phone > add a test phone number, sign in with it from a client app, and paste the resulting idToken here.\n   b) Ask your backend dev to seed a test User/ServiceProvider directly in MongoDB and hand you a JWT for {{userToken}} / {{providerToken}} — this is what was used during development testing.\n5. IDs and tokens (categoryId, providerId, bookingId, userId, complaintId, adminToken, userToken, providerToken) auto-save into environment/collection variables via each request's Tests script, so later requests fill in automatically as long as you run things in the order above.\n6. Admin-only routes need {{adminToken}}; user-only need {{userToken}}; provider-only need {{providerToken}}.",
+    "description": "Full API collection for the Ghar Ka Sathi backend, organized into the 3 product panels: Service Provider Panel, User Panel, Admin Panel.\n\nHOW TO USE:\n1. Import this file AND 'postman_environment.json' into Postman, then select the 'Ghar Ka Sathi - Local' environment (top-right dropdown).\n2. Make sure the backend is running (npm run dev) and MONGO_URI points to a live MongoDB.\n\nSUGGESTED RUN ORDER (a booking involves BOTH a provider and a user, so the two panels genuinely interleave — this is the realistic order, not strictly top-to-bottom by folder):\n  1. Service Provider Panel > Registration/Login, then > Setup (Admin Bootstrap) — creates the shared category and admin login used everywhere else.\n  2. Service Provider Panel > Profile Management, then > Admin Approval — provider must be approved before anyone can book them.\n  3. User Panel > Registration/Login, then > Search Services, then > Book Service & Track Booking (creates the booking).\n  4. Service Provider Panel > Order/Booking Receive — accept the quote, mark in-progress, mark completed.\n  5. User Panel > Rate & Review, > Online Payment (or Service Provider Panel > Earnings Dashboard for cash payment), > Chat, > Complaints.\n  6. Admin Panel — can run any time after step 1 for its setup pieces; Resolve Complaint / Payment Reports / Analytics make most sense after step 5.\n3. 'Registration/Login > Check Mobile' is called BEFORE the OTP is even sent — just tells the client if the number is new, never creates anything. 'Send OTP' generates and stores a one-time code for that phone+role. 'Verify OTP' checks that code — it always runs, for both new and existing accounts, and is what actually logs the user in.\n4. There is no SMS gateway wired up, so outside production 'Send OTP' returns the generated code as { devOtp } (and logs it server-side) — each 'Send OTP' request's Tests script auto-saves it into {{userOtp}}/{{providerOtp}} for the 'Verify OTP' request right after it. No Firebase project or real SMS is needed to run this collection.\n5. IDs and tokens (categoryId, providerId, bookingId, userId, complaintId, adminToken, userToken, providerToken, userOtp, providerOtp) auto-save into environment/collection variables via each request's Tests script, so later requests fill in automatically as long as you run things in the order above.\n6. Admin-only routes need {{adminToken}}; user-only need {{userToken}}; provider-only need {{providerToken}}.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -65,6 +65,54 @@
               "response": []
             },
             {
+              "name": "Send OTP — Provider",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/send-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "send-otp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"+912222222222\",\n  \"role\": \"provider\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "There is no SMS gateway configured, so outside production the response also includes { devOtp } (and logs it server-side) purely so this flow is testable without a real SMS provider. Auto-saves {{providerOtp}} for the next request."
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let __gksData = {};",
+                      "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                      "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                      "{ const __gksV = __gksSafeGet(__gksData, 'devOtp'); if (__gksV !== undefined) { pm.environment.set('providerOtp', __gksV); pm.collectionVariables.set('providerOtp', __gksV); console.log('Saved providerOtp =', __gksV); } }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Verify OTP — Provider",
               "request": {
                 "method": "POST",
@@ -87,14 +135,14 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"idToken\": \"<firebase-id-token>\",\n  \"role\": \"provider\",\n  \"name\": \"Test Provider\"\n}",
+                  "raw": "{\n  \"phone\": \"+912222222222\",\n  \"otp\": \"{{providerOtp}}\",\n  \"role\": \"provider\",\n  \"name\": \"Test Provider\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
                     }
                   }
                 },
-                "description": "Client verifies the phone OTP with Firebase, then sends the resulting idToken here. Backend verifies it, finds-or-creates the ServiceProvider, returns our JWT. Runs for both new and existing providers. Needs a REAL Firebase idToken (see collection description)."
+                "description": "Verifies the code from Send OTP above (auto-filled into {{providerOtp}}), then finds-or-creates the ServiceProvider and returns our JWT. Runs for both new and existing providers."
               },
               "response": [],
               "event": [
@@ -782,6 +830,54 @@
               "response": []
             },
             {
+              "name": "Send OTP — User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/send-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "send-otp"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"+911111111111\",\n  \"role\": \"user\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "There is no SMS gateway configured, so outside production the response also includes { devOtp } (and logs it server-side) purely so this flow is testable without a real SMS provider. Auto-saves {{userOtp}} for the next request."
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let __gksData = {};",
+                      "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                      "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                      "{ const __gksV = __gksSafeGet(__gksData, 'devOtp'); if (__gksV !== undefined) { pm.environment.set('userOtp', __gksV); pm.collectionVariables.set('userOtp', __gksV); console.log('Saved userOtp =', __gksV); } }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
               "name": "Verify OTP — User",
               "request": {
                 "method": "POST",
@@ -804,14 +900,14 @@
                 },
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"idToken\": \"<firebase-id-token>\",\n  \"role\": \"user\",\n  \"name\": \"Test User\"\n}",
+                  "raw": "{\n  \"phone\": \"+911111111111\",\n  \"otp\": \"{{userOtp}}\",\n  \"role\": \"user\",\n  \"name\": \"Test User\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
                     }
                   }
                 },
-                "description": "Client verifies the phone OTP with Firebase, then sends the resulting idToken here. Backend verifies it, finds-or-creates the User, returns our JWT. Runs for both new and existing users. Needs a REAL Firebase idToken (see collection description)."
+                "description": "Verifies the code from Send OTP above (auto-filled into {{userOtp}}), then finds-or-creates the User and returns our JWT. Runs for both new and existing users."
               },
               "response": [],
               "event": [
@@ -944,7 +1040,112 @@
                       "language": "json"
                     }
                   }
-                }
+                },
+                "description": "lat/lng are optional — the mobile app has no GPS, so most calls only ever send `text`. If either coordinate is provided, both must be valid."
+              },
+              "response": []
+            },
+            {
+              "name": "Get My Saved Addresses",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/me/addresses",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "me",
+                    "addresses"
+                  ]
+                },
+                "description": "Returns the plain string[] of saved addresses shown in the address-picker bottom sheet."
+              },
+              "response": []
+            },
+            {
+              "name": "Add Saved Address",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/me/addresses",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "me",
+                    "addresses"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address\": \"Flat 204, Royal Palms Apartment, Indiranagar, Bengaluru - 560038\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Idempotent — adding the same address text twice is a no-op. Returns the updated string[] list."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Saved Address",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/users/me/addresses",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "users",
+                    "me",
+                    "addresses"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"address\": \"Flat 204, Royal Palms Apartment, Indiranagar, Bengaluru - 560038\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Matches by exact address text. Returns the updated string[] list."
               },
               "response": []
             }
@@ -1010,7 +1211,48 @@
                     }
                   ]
                 },
-                "description": "Public. Only returns approved + available providers. Omit lat/lng to just filter by category, sorted by rating."
+                "description": "Public. Only returns approved + available providers. Omit lat/lng to just filter by category, sorted by rating. When lat/lng are passed, each result includes a computed distanceKm."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Provider Profile",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/providers/{{providerId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "providers",
+                    "{{providerId}}"
+                  ]
+                },
+                "description": "Public. Full provider profile — shown on the provider profile screen alongside Get Provider Reviews below."
+              },
+              "response": []
+            },
+            {
+              "name": "Get Provider Reviews",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/providers/{{providerId}}/reviews",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "providers",
+                    "{{providerId}}",
+                    "reviews"
+                  ]
+                },
+                "description": "Public. Reviews left for this provider, newest first — shown on the provider's profile screen. Most meaningful after User Panel > Rate & Review has run at least once."
               },
               "response": []
             }
@@ -1349,6 +1591,147 @@
                   }
                 },
                 "description": "Also broadcasts in real time over Socket.io to room booking:<id> — REST is enough for functional testing. \"Call\" is click-to-call using the phone number already returned on the booking/profile, not an in-app VoIP endpoint."
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Notifications",
+          "item": [
+            {
+              "name": "Get My Notifications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications"
+                  ]
+                },
+                "description": "Newest first. Also pushed live over Socket.io to room account:<userId> as event 'notification' whenever a booking status change creates one — REST is enough for functional testing."
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let __gksData = {};",
+                      "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                      "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                      "{ const __gksV = __gksSafeGet(__gksData, '0._id'); if (__gksV !== undefined) { pm.environment.set('notificationId', __gksV); pm.collectionVariables.set('notificationId', __gksV); console.log('Saved notificationId =', __gksV); } }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Mark Notification As Read",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}/read",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "{{notificationId}}",
+                    "read"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Mark All As Read",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/read-all",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "read-all"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Notification",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications/{{notificationId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications",
+                    "{{notificationId}}"
+                  ]
+                },
+                "description": "ALTERNATE ENDING for a single notification — run on a fresh notificationId if you also want to test Clear All Notifications below, since this one deletes it first."
+              },
+              "response": []
+            },
+            {
+              "name": "Clear All Notifications",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{userToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/notifications",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "notifications"
+                  ]
+                },
+                "description": "Deletes every notification for this user — run last so it doesn't wipe out {{notificationId}} before the two requests above use it."
               },
               "response": []
             }
@@ -1695,6 +2078,126 @@
                   }
                 },
                 "description": "commissionPercent here is the Commission Management piece — it drives the payout split in Service Provider Panel > Earnings and User Panel > Online Payment."
+              },
+              "response": []
+            },
+            {
+              "name": "Add Sub-Service",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}/sub-services",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories",
+                    "{{categoryId}}",
+                    "sub-services"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Tap/Mixer Installation\",\n  \"description\": \"Replacing or installing new bathroom and kitchen fittings.\",\n  \"basePrice\": 199\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Returns the updated Category doc — grab the new sub-service's _id from response.subServices to fill {{subServiceId}} for the two requests below and for User Panel > Book Service (subServiceId is optional there, but exercises the price-quote path)."
+              },
+              "response": [],
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "let __gksData = {};",
+                      "try { __gksData = pm.response.json(); } catch (e) { __gksData = {}; }",
+                      "function __gksSafeGet(obj, path) { return path.split(\".\").reduce((o, k) => (o && o[k] !== undefined) ? o[k] : undefined, obj); }",
+                      "{ const __gksSubs = __gksSafeGet(__gksData, 'subServices'); if (Array.isArray(__gksSubs) && __gksSubs.length) { const __gksV = __gksSubs[__gksSubs.length - 1]._id; pm.environment.set('subServiceId', __gksV); pm.collectionVariables.set('subServiceId', __gksV); console.log('Saved subServiceId =', __gksV); } }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Sub-Service",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}/sub-services/{{subServiceId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories",
+                    "{{categoryId}}",
+                    "sub-services",
+                    "{{subServiceId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"basePrice\": 229\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Any of name/description/basePrice can be updated independently."
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Sub-Service",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/categories/{{categoryId}}/sub-services/{{subServiceId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "categories",
+                    "{{categoryId}}",
+                    "sub-services",
+                    "{{subServiceId}}"
+                  ]
+                },
+                "description": "ALTERNATE ENDING — only run this if you don't need {{subServiceId}} for User Panel > Book Service anymore."
               },
               "response": []
             },
@@ -2256,6 +2759,26 @@
     },
     {
       "key": "razorpayOrderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userOtp",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "providerOtp",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "notificationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "subServiceId",
       "value": "",
       "type": "string"
     }
