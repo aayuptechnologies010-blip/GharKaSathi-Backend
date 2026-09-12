@@ -24,6 +24,10 @@ function initSocket(io) {
       return;
     }
 
+    // Automatically join personal room for broadcast notifications
+    socket.join(`${account.role}:${account.id}`);
+
+
     socket.on('join-booking', async (bookingId) => {
       const filter = account.role === 'provider' ? { _id: bookingId, provider: account.id } : { _id: bookingId, user: account.id };
       const booking = await Booking.findOne(filter);

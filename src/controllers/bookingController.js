@@ -19,28 +19,40 @@ const STATUS_TRANSITIONS = {
 
 // POST /api/bookings (user)
 const createBooking = asyncHandler(async (req, res) => {
-  const { providerId, categoryId, scheduledAt, address, notes } = req.body;
+  const { categoryId, scheduledAt, address, notes } = req.body;
 
-  if (!providerId || !categoryId || !scheduledAt) {
-    return res.status(400).json({ message: 'providerId, categoryId and scheduledAt are required' });
-  }
-
-  const provider = await ServiceProvider.findById(providerId);
-  if (!provider || !provider.isApproved || !provider.isAvailable) {
-    return res.status(400).json({ message: 'Provider is not available for booking' });
-  }
-  if (!provider.categories.some((c) => c.toString() === categoryId)) {
-    return res.status(400).json({ message: 'This provider does not offer the selected category' });
+  if (!categoryId || !scheduledAt || !address || !address.lat || !address.lng) {
+    return res.status(400).json({ message: 'categoryId, scheduledAt, and valid address are required' });
   }
 
   const booking = await Booking.create({
     user: req.account._id,
-    provider: providerId,
     category: categoryId,
     scheduledAt,
     address,
     notes,
   });
+
+  // Find nearby providers (within 10km)
+  const MAX_DISTANCE = 10000;
+  const nearbyProviders = await ServiceProvider.find({
+    isApproved: true,
+    isAvailable: true,
+    categories: categoryId,
+    location: {
+      $near: {
+        $geometry: { type: 'Point', coordinates: [address.lng, address.lat] },
+        $maxDistance: MAX_DISTANCE,
+      },
+    },
+  });
+
+  const io = req.app.get('io');
+  if (io && nearbyProviders.length > 0) {
+    nearbyProviders.forEach((provider) => {
+      io.to(`provider:${provider._id}`).emit('new-booking-request', booking);
+    });
+  }
 
   res.status(201).json(booking);
 });
@@ -67,6 +79,40 @@ const getProviderBookings = asyncHandler(async (req, res) => {
   res.json(bookings);
 });
 
+// GET /api/bookings/open-requests (provider)
+const getOpenRequests = asyncHandler(async (req, res) => {
+  const provider = await ServiceProvider.findById(req.account._id);
+  if (!provider || !provider.location || !provider.location.coordinates) {
+    return res.status(400).json({ message: 'Provider location not found' });
+  }
+
+  const MAX_DISTANCE = 10000;
+  const openBookings = await Booking.find({
+    status: 'pending',
+    provider: null,
+    category: { $in: provider.categories }
+  }).populate('user', 'name phone').populate('category', 'name icon');
+
+  const bookingsWithDistance = openBookings.filter(b => {
+    if (!b.address || !b.address.lat || !b.address.lng) return false;
+    const R = 6371e3; // metres
+    const phi1 = provider.location.coordinates[1] * Math.PI/180;
+    const phi2 = b.address.lat * Math.PI/180;
+    const dPhi = (b.address.lat - provider.location.coordinates[1]) * Math.PI/180;
+    const dLam = (b.address.lng - provider.location.coordinates[0]) * Math.PI/180;
+
+    const a = Math.sin(dPhi/2) * Math.sin(dPhi/2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(dLam/2) * Math.sin(dLam/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    const d = R * c;
+    return d <= MAX_DISTANCE;
+  });
+
+  res.json(bookingsWithDistance);
+});
+
 // PUT /api/bookings/:id/status (provider)
 // When accepting, the provider can attach a price quote for the user to pay.
 const updateBookingStatus = asyncHandler(async (req, res) => {
@@ -77,9 +123,20 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: `status must be one of: ${allowed.join(', ')}` });
   }
 
-  const booking = await Booking.findOne({ _id: req.params.id, provider: req.account._id });
+  const booking = await Booking.findById(req.params.id);
   if (!booking) {
     return res.status(404).json({ message: 'Booking not found' });
+  }
+
+  if (status === 'accepted' && booking.status === 'pending') {
+    if (booking.provider) {
+      return res.status(400).json({ message: 'Booking already accepted by someone else' });
+    }
+    booking.provider = req.account._id;
+  } else {
+    if (booking.provider?.toString() !== req.account._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized for this booking' });
+    }
   }
 
   if (!STATUS_TRANSITIONS[booking.status]?.includes(status)) {
@@ -99,13 +156,23 @@ const updateBookingStatus = asyncHandler(async (req, res) => {
 
   booking.status = status;
   await booking.save();
+
+  if (status === 'accepted') {
+    const io = req.app.get('io');
+    if (io) io.to(`user:${booking.user}`).emit('booking-accepted', booking);
+  }
+
   res.json(booking);
 });
 
 // GET /api/bookings/:id (user who owns it, or provider assigned to it) — "Track Booking"
 const getBookingById = asyncHandler(async (req, res) => {
-  const filter =
-    req.role === 'provider' ? { _id: req.params.id, provider: req.account._id } : { _id: req.params.id, user: req.account._id };
+  let filter;
+  if (req.role === 'provider') {
+    filter = { _id: req.params.id, $or: [{ provider: req.account._id }, { status: 'pending' }] };
+  } else {
+    filter = { _id: req.params.id, user: req.account._id };
+  }
 
   const booking = await Booking.findOne(filter)
     .populate('user', 'name phone')
@@ -173,6 +240,7 @@ module.exports = {
   createBooking,
   getMyBookings,
   getProviderBookings,
+  getOpenRequests,
   getBookingById,
   updateBookingStatus,
   cancelBooking,

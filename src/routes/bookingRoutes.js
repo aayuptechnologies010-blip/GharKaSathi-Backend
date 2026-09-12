@@ -4,6 +4,7 @@ const {
   createBooking,
   getMyBookings,
   getProviderBookings,
+  getOpenRequests,
   getBookingById,
   updateBookingStatus,
   cancelBooking,
@@ -18,6 +19,7 @@ router.put('/:id/cancel', protect('user'), cancelBooking);
 router.post('/:id/review', protect('user'), addReview);
 
 router.get('/provider', protect('provider'), getProviderBookings);
+router.get('/open-requests', protect('provider'), getOpenRequests);
 router.put('/:id/status', protect('provider'), updateBookingStatus);
 
 router.get('/:id', protect('user', 'provider'), getBookingById);

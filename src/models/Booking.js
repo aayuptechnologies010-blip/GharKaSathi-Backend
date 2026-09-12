@@ -5,7 +5,7 @@ const BOOKING_STATUSES = ['pending', 'accepted', 'rejected', 'in-progress', 'com
 const bookingSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    provider: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceProvider', required: true },
+    provider: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceProvider' },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
     status: { type: String, enum: BOOKING_STATUSES, default: 'pending' },
     scheduledAt: { type: Date, required: true },
